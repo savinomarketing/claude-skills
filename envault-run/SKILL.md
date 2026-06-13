@@ -128,6 +128,17 @@ Then fill in the plist:
 PATH must include `~/.bun/bin` (envault uses Bun's SQLite) and the npm global bin dir
 (envault + envault-run live there). HOME must be set so envault can find `~/.envault/`.
 
+**StandardOutPath/StandardErrorPath must point at `~/Library/Logs/<project>/`, NEVER at a
+directory inside `~/Documents` (e.g. a repo `logs/` folder).** Reason, proven June 12, 2026
+when all four hydr8 agents died: launchd opens the log files during posix_spawn in the
+security context of the new process, and that process image is `/bin/bash` (envault-run is a
+bash script), which has no TCC grant for Documents. If a log file in Documents was ever
+recreated by a sandboxed tool (Claude Code shell, etc.), it carries a `com.apple.provenance`
+xattr without the `com.apple.macl` access grant, the pre-spawn open is denied, and the agent
+dies as `last exit code = 78: EX_CONFIG` with ZERO output anywhere. Exit 78 + empty logs =
+this, not a script bug. Granting Full Disk Access to node does not help (bash is the image at
+spawn time). Bisect method + full diagnostic playbook: project1 `memory/launchagents.md`.
+
 ## Key Safety Rules
 
 - **NEVER** `envault var get KEY` directly: it outputs the secret in plaintext to stdout
@@ -160,6 +171,10 @@ Quick audit (4 most critical checks):
 - Confirm `envault-run` is `command` (not the server binary)
 - Confirm server binary is in `args` after `"--"`
 - Restart Claude Code after `.mcp.json` changes
+
+**`command not found` inside `envault-run -- sh -c '...'`:**
+- The spawned `sh` does NOT load the user's shell profile, so user-PATH binaries (Homebrew keg-only formulas especially) are invisible even when they work in a normal terminal
+- Use the absolute binary path inside the quoted command. Example hit June 12, 2026: `psql` lives at `/opt/homebrew/opt/libpq/bin/psql` (libpq is keg-only); `envault-run -- sh -c 'psql "$SUPABASE_DB_URL" ...'` fails with exit 127 while `envault-run -- sh -c '/opt/homebrew/opt/libpq/bin/psql "$SUPABASE_DB_URL" ...'` works
 
 ## envault-run Internals
 
