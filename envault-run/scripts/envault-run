@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# envault-run: inject the current project's envault variables into the
+# environment at runtime, then exec the given command. Nothing is written
+# to disk; the child process inherits the variables and they die with it.
+#
+# Usage:
+#   envault-run -- <command> [args...]
+#   envault-run npm run dev          # the -- is optional
+#
+# Rebuilt 2026-07-02 after the coffee-spill machine loss (the original lived
+# only in ~/.npm-global/bin and was never committed anywhere - lesson learned,
+# this copy is git-backed in claude-skills/envault-run/scripts/ and installed
+# by copying to a bin dir on PATH, e.g.:
+#   install -m 755 scripts/envault-run /opt/homebrew/bin/envault-run
+#
+# envault is project-scoped by current directory, so run this from the
+# project root whose vault you want injected.
+set -euo pipefail
+
+if [ "${1:-}" = "--" ]; then shift; fi
+if [ $# -eq 0 ]; then
+  echo "usage: envault-run [--] <command> [args...]" >&2
+  exit 64
+fi
+
+# Inject each variable from the current project's vault. If the project is
+# not tracked by envault (or has no vars), run the command with the plain
+# environment rather than failing: envault-run must be safe to use in
+# scripts and LaunchAgents that also run in secret-free projects.
+keys="$(envault var list --json 2>/dev/null | jq -r 'keys[]' 2>/dev/null || true)"
+if [ -n "$keys" ]; then
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    if value="$(envault var get "$key" 2>/dev/null)"; then
+      export "$key=$value"
+    fi
+  done <<< "$keys"
+fi
+
+exec "$@"
