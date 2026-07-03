@@ -27,7 +27,9 @@ fi
 # not tracked by envault (or has no vars), run the command with the plain
 # environment rather than failing: envault-run must be safe to use in
 # scripts and LaunchAgents that also run in secret-free projects.
-keys="$(envault var list --json 2>/dev/null | jq -r 'keys[]' 2>/dev/null || true)"
+# envault's JSON is {"<profile>": [{key, value}, ...]} — an array under a
+# profile wrapper, so plain 'keys[]' yields profile names, not var names.
+keys="$(envault var list --json 2>/dev/null | jq -r 'to_entries[].value[].key' 2>/dev/null || true)"
 if [ -n "$keys" ]; then
   while IFS= read -r key; do
     [ -n "$key" ] || continue
