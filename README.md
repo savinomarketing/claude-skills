@@ -16,7 +16,7 @@ Use it when:
 - Configuring MCP servers or LaunchAgent plists to inject secrets at runtime
 - Diagnosing why envault-run is not finding credentials
 
-The `envault-run` wrapper itself is a separate tool (not in this repo). It lives at `~/.npm-global/bin/envault-run` on my machine. Source distribution TBD; for now the skill assumes you have it.
+The `envault-run` wrapper script ships in this repo at [`envault-run/scripts/envault-run`](envault-run/scripts/envault-run). Install it somewhere on your PATH (I use `/opt/homebrew/bin/envault-run`) and keep the installed copy in sync with the repo copy when it changes.
 
 ### [`html-gif/`](html-gif/): HTML/CSS animations to GIF
 
