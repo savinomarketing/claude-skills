@@ -24,8 +24,10 @@ Template rules (critical):
 
 ### 2. Capture and assemble
 
+Always use `render.sh` (never bare `python3 scripts/capture.py`): the toolchain lives in the `~/.venvs/hydr8-tools` venv, and the launcher auto-installs anything missing before rendering.
+
 ```bash
-python3 scripts/capture.py <template.html> <output.gif> [options]
+scripts/render.sh <template.html> <output.gif> [options]
 ```
 
 Options:
@@ -37,6 +39,7 @@ Options:
 | `--fps` | 15 | Frames per second |
 | `--duration` | 2.5 | Animation duration in seconds |
 | `--colors` | 128 | Color palette size (fewer = smaller file) |
+| `--dedup` | 0.9995 | Frame dedup similarity threshold. Use `1.0` when the animation has small-area motion (a wink, a ticking digit); the default silently drops those frames as near-identical |
 | `--scale` | 2 | Device pixel ratio (2 = retina quality) |
 | `--no-preview` | off | Skip auto-opening the GIF on Mac after creation |
 | `--upload` | off | Upload to Giphy after creation (requires GIPHY_API_KEY) |
@@ -47,13 +50,13 @@ Common presets:
 
 ```bash
 # Square comment GIF (default)
-python3 scripts/capture.py template.html out.gif
+scripts/render.sh template.html out.gif
 
 # Wide comment GIF
-python3 scripts/capture.py template.html out.gif --width 600 --height 340
+scripts/render.sh template.html out.gif --width 600 --height 340
 
 # Stat callout (compact, fast)
-python3 scripts/capture.py template.html out.gif --width 480 --height 270 --fps 20 --duration 2 --colors 64
+scripts/render.sh template.html out.gif --width 480 --height 270 --fps 20 --duration 2 --colors 64
 ```
 
 ### 3. Upload to Giphy (optional)
@@ -62,9 +65,9 @@ Add `--upload` to push the GIF directly to your Giphy channel. The Giphy API key
 
 ```bash
 # Capture and upload in one command
-GIPHY_API_KEY=your_key python3 scripts/capture.py template.html out.gif --upload --tags "logo,brand" --title "Logo Reveal"
+GIPHY_API_KEY=your_key scripts/render.sh template.html out.gif --upload --tags "logo,brand" --title "Logo Reveal"
 
-# Or upload an existing GIF separately
+# Or upload an existing GIF separately (upload.py is stdlib-only, any python3 works)
 GIPHY_API_KEY=your_key python3 scripts/upload.py path/to/your.gif --tags "logo,brand"
 ```
 
@@ -91,22 +94,25 @@ Customizing the demo template:
 1. Copy `assets/templates/demo.html` to a new filename
 2. Update the CSS custom properties at the top (`--bg`, `--accent`, `--text`, fonts)
 3. Replace the text or SVG content
-4. Run `capture.py` with desired dimensions
+4. Run `scripts/render.sh` with desired dimensions
 
 See `references/specs-and-patterns.md` for animation pattern recipes (staggered reveal, shimmer sweep, counter ticker, slide+fade, wipe transition) and platform-specific specs (LinkedIn, Twitter, Slack).
 
 ## Dependencies
 
-```bash
-pip install playwright pillow imageio numpy
-playwright install chromium
-```
+Managed automatically by `scripts/render.sh`: everything runs through the shared `~/.venvs/hydr8-tools` venv, and missing packages are reinstalled from `requirements.txt` (plus the Playwright Chromium build, one-time ~150 MB) on first use. Do not `pip install` into Homebrew's system python; it has no GIF deps and blocks installs (PEP 668). The capture runs headless so nothing pops up on screen.
 
-Playwright needs Chromium installed (one-time, ~150 MB). The capture runs headless so nothing pops up on screen.
+Manual bootstrap, only if the venv is gone entirely:
+
+```bash
+python3 -m venv ~/.venvs/hydr8-tools
+~/.venvs/hydr8-tools/bin/pip install -r requirements.txt
+~/.venvs/hydr8-tools/bin/python3 -m playwright install chromium
+```
 
 ## Programmatic Usage
 
-The capture functions can also be imported:
+The capture functions can also be imported (use the venv interpreter, `~/.venvs/hydr8-tools/bin/python3`):
 
 ```python
 from scripts.capture import capture_frames, assemble_gif, preview

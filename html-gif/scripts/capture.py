@@ -117,6 +117,7 @@ def assemble_gif(
     fps: int = 15,
     num_colors: int = 128,
     loop: int = 0,
+    dedup_similarity: float = 0.9995,
 ) -> dict:
     """
     Assemble captured frames into an optimized GIF.
@@ -163,12 +164,15 @@ def assemble_gif(
         q = pf.quantize(palette=global_palette, dither=1)
         optimized.append(np.array(q.convert("RGB")))
 
-    # Deduplicate consecutive near-identical frames
+    # Deduplicate consecutive near-identical frames. Subtle motion in a small
+    # region (a wink, a ticking digit) can fall under the default threshold and
+    # get eaten; pass a higher --dedup (up to 1.0 = keep everything that
+    # changed at all) when the animation has small-area detail.
     deduped = [optimized[0]]
     for i in range(1, len(optimized)):
         diff = np.abs(optimized[i].astype(float) - deduped[-1].astype(float))
         similarity = 1.0 - (np.mean(diff) / 255.0)
-        if similarity < 0.9995:
+        if similarity < dedup_similarity:
             deduped.append(optimized[i])
 
     # Save
@@ -217,6 +221,7 @@ def main():
     parser.add_argument("--fps", type=int, default=15, help="Frames per second (default: 15)")
     parser.add_argument("--duration", type=float, default=2.5, help="Duration in seconds (default: 2.5)")
     parser.add_argument("--colors", type=int, default=128, help="Color palette size (default: 128)")
+    parser.add_argument("--dedup", type=float, default=0.9995, help="Frame dedup similarity threshold; frames more similar than this to the last kept frame are dropped. Use 1.0 to keep every changed frame, e.g. for small-area motion like a wink (default: 0.9995)")
     parser.add_argument("--scale", type=int, default=2, help="Device scale factor (default: 2, retina)")
     parser.add_argument("--no-preview", action="store_true", help="Skip auto-opening the GIF after creation")
     parser.add_argument("--upload", action="store_true", help="Upload to Giphy after creation (requires GIPHY_API_KEY)")
@@ -241,6 +246,7 @@ def main():
         output_path=args.output,
         fps=args.fps,
         num_colors=args.colors,
+        dedup_similarity=args.dedup,
     )
 
     if not args.no_preview:
