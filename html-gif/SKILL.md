@@ -82,6 +82,19 @@ Note on Giphy indexing: new uploads on standard API keys are not indexed for pub
 - Dark or flat backgrounds compress significantly better than gradients
 - Output file path and size are printed by the script
 
+## SVG → GIF (animate a static vector mark)
+
+Turn any static `.svg` (e.g. an AI-generated brandmark) into an animated GIF without hand-editing HTML. `render.sh` cleans the SVG (strips a full-canvas white background rect if present, makes it scale to the frame), wraps it in a CSS animation preset, and captures it.
+
+```bash
+scripts/render.sh --svg mark.svg --anim fill out.gif
+scripts/render.sh --svg mark.svg --anim pop out.gif --width 800 --height 800 --duration 2.9 --bg "#071e33"
+```
+
+**Presets** (`--anim`): `fill` (rises from bottom + glow settle), `pop` (bouncy scale-in), `draw` (wipe reveal), `stagger` (paths sequence in), `spin` (3D flip), `float` (fade + bob loop).
+
+**Defaults in `--svg` mode:** 800×800 canvas, 2.9s duration. `--bg` is the page color the mark's transparent areas show through. `fill`/`draw`/`stagger` are thin-band motion, so `--dedup 1.0` is set automatically (the default 0.9995 would eat the moving edge). Preset logic lives in `scripts/svg_anim.py`.
+
 ## Template Design Rules
 
 CSS animation requirements:

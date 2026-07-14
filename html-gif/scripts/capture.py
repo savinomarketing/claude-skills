@@ -214,20 +214,56 @@ def preview(file_path: str):
 
 def main():
     parser = argparse.ArgumentParser(description="HTML/CSS animation to GIF capture engine")
-    parser.add_argument("html_file", help="Path to HTML animation template")
-    parser.add_argument("output", help="Output GIF path")
+    parser.add_argument("html_file", nargs="?", default=None, help="Path to HTML animation template (omit when using --svg)")
+    parser.add_argument("output", nargs="?", default=None, help="Output GIF path")
+    parser.add_argument("--svg", default=None, help="Path to a static SVG brandmark. It is cleaned and wrapped in an --anim preset, so no HTML template is needed. Usage: --svg mark.svg --anim fill out.gif")
+    parser.add_argument("--anim", default="fill", help="Animation preset for --svg mode: fill, pop, draw, stagger, spin, float (default: fill)")
+    parser.add_argument("--bg", default="#071e33", help="Background color for --svg mode (default: #071e33)")
     parser.add_argument("--width", type=int, default=480, help="Width in pixels (default: 480)")
     parser.add_argument("--height", type=int, default=480, help="Height in pixels (default: 480)")
     parser.add_argument("--fps", type=int, default=15, help="Frames per second (default: 15)")
     parser.add_argument("--duration", type=float, default=2.5, help="Duration in seconds (default: 2.5)")
     parser.add_argument("--colors", type=int, default=128, help="Color palette size (default: 128)")
-    parser.add_argument("--dedup", type=float, default=0.9995, help="Frame dedup similarity threshold; frames more similar than this to the last kept frame are dropped. Use 1.0 to keep every changed frame, e.g. for small-area motion like a wink (default: 0.9995)")
+    parser.add_argument("--dedup", type=float, default=None, help="Frame dedup similarity threshold; frames more similar than this to the last kept frame are dropped. Use 1.0 to keep every changed frame, e.g. for small-area motion like a wink. Default 0.9995, but --svg thin-band presets (fill/draw/stagger) default to 1.0 automatically")
     parser.add_argument("--scale", type=int, default=2, help="Device scale factor (default: 2, retina)")
     parser.add_argument("--no-preview", action="store_true", help="Skip auto-opening the GIF after creation")
     parser.add_argument("--upload", action="store_true", help="Upload to Giphy after creation (requires GIPHY_API_KEY)")
     parser.add_argument("--tags", default="", help="Giphy tags, comma-separated")
     parser.add_argument("--title", default="", help="Giphy display title")
     args = parser.parse_args()
+
+    # --svg mode: build an animation template on the fly from a static vector.
+    # In this mode only the output .gif positional is given, which argparse
+    # parks in html_file; shuffle it into output and generate the template.
+    tmp_template = None
+    if args.svg:
+        from svg_anim import build_template, THIN_BAND_ANIMS
+
+        if args.output is None:
+            args.output = args.html_file
+        if args.output is None:
+            parser.error("--svg mode needs an output path, e.g.: --svg mark.svg --anim fill out.gif")
+        if args.width == 480 and args.height == 480:
+            args.width = args.height = 800
+        if args.duration == 2.5:
+            args.duration = 2.9
+        html = build_template(
+            svg_path=args.svg, anim=args.anim, width=args.width,
+            height=args.height, bg=args.bg, duration=args.duration,
+        )
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".html", delete=False)
+        tmp.write(html)
+        tmp.close()
+        tmp_template = tmp.name
+        args.html_file = tmp_template
+        if args.dedup is None and args.anim in THIN_BAND_ANIMS:
+            args.dedup = 1.0
+        print(f"SVG mode: {args.svg}  ->  '{args.anim}' preset")
+
+    if args.html_file is None or args.output is None:
+        parser.error("provide <template.html> <output.gif>, or use --svg <mark.svg> <output.gif>")
+    if args.dedup is None:
+        args.dedup = 0.9995
 
     print(f"Capturing: {args.html_file}")
     print(f"  {args.width}x{args.height} @ {args.fps}fps, {args.duration}s")
@@ -259,6 +295,9 @@ def main():
             tags=args.tags,
             title=args.title,
         )
+
+    if tmp_template:
+        Path(tmp_template).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
